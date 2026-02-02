@@ -1,0 +1,8 @@
+defaults:
+  - agent: ppo
+  - env: cartpole
+  - _self_
+
+train:
+  max_episodes: 1000
+  print_interval: 20
