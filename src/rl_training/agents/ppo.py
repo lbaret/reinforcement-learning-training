@@ -20,9 +20,9 @@ class PPO:
         self,
         state_dim: int,
         action_dim: int,
-        lr: float = 0.002,
+        lr: float = 0.001,
         gamma: float = 0.99,
-        eps_clip: float = 0.2,
+        eps_clip: float = 0.1,
         k_epochs: int = 4,
         device: Union[torch.device, str] = "cpu",
     ) -> None:
@@ -99,7 +99,10 @@ class PPO:
         with torch.no_grad():
             target = r + self.gamma * self.policy_old.critic(s_prime) * done_mask
             advantage = target - self.policy_old.critic(s)
-            advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-10)
+            if advantage.shape[0] > 1:
+                advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-10)
+            else:
+                advantage = torch.tensor([0.0], device=self.device)
 
         for _ in range(self.k_epochs):
             log_probs, state_values, dist_entropy = self.policy.evaluate(s, a.squeeze())
