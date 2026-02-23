@@ -4,6 +4,7 @@ import click
 import gymnasium as gym
 import matplotlib.pyplot as plt
 import torch
+from gymnasium.wrappers import NormalizeObservation
 from tqdm import tqdm
 
 from rl_training.agents.ppo import PPO
@@ -15,6 +16,7 @@ from rl_training.agents.ppo import PPO
 def main(agent_horizon: int, total_episodes: int) -> None:
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     env = gym.make("CartPole-v1", render_mode=None)
+    env = NormalizeObservation(env)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
     model = PPO(state_dim=state_dim, action_dim=action_dim, device=device)
@@ -64,6 +66,12 @@ def main(agent_horizon: int, total_episodes: int) -> None:
     plt.show()
 
     env_show = gym.make("CartPole-v1", render_mode="human")
+    env_show = NormalizeObservation(env_show)
+
+    env_show.obs_rms.mean = env.obs_rms.mean.copy()
+    env_show.obs_rms.var = env.obs_rms.var.copy()
+    env_show.update_running_mean = False
+
     s, _ = env_show.reset()
     done = False
     truncated = False
