@@ -10,10 +10,15 @@ from tqdm import tqdm
 from rl_training.agents.ppo import PPO
 
 
-@click.command()
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
 @click.option("--agent-horizon", default=50, help="Horizon for the agent.")
 @click.option("--total-episodes", default=500, help="Total number of episodes.")
-def main(agent_horizon: int, total_episodes: int) -> None:
+def run_cartpole_ppo(agent_horizon: int, total_episodes: int) -> None:
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     env = gym.make("CartPole-v1", render_mode=None)
     env = NormalizeObservation(env)
@@ -85,4 +90,4 @@ def main(agent_horizon: int, total_episodes: int) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    cli()

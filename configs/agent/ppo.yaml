@@ -1,6 +1,0 @@
-name: ppo
-learning_rate: 0.002
-gamma: 0.99
-eps_clip: 0.2
-k_epochs: 4
-t_horizon: 20

@@ -1,6 +1,6 @@
-# RL Training - PPO with Hydra
+# RL Training
 
-This repository contains a clean implementation of the Proximal Policy Optimization (PPO) algorithm using [Gymnasium](https://gymnasium.farama.org/), [PyTorch](https://pytorch.org/), and [Hydra](https://hydra.cc/) for configuration management.
+This repository contains, only for the moment, a clean implementation of the Proximal Policy Optimization (PPO) algorithm using [Gymnasium](https://gymnasium.farama.org/) and [PyTorch](https://pytorch.org/).
 
 ## 🚀 Getting Started
 
@@ -25,16 +25,11 @@ This project uses `uv` for dependency management. If you don't have it installed
 
 ```text
 rl-training/
-├── configs/                # Hydra configuration files
-│   ├── agent/              # Agent-specific configs (PPO)
-│   ├── env/                # Environment-specific configs (CartPole)
-│   └── config.yaml         # Main configuration entry point
-├── scripts/
-│   └── ppo.py              # Main training script
 ├── src/rl_training/
 │   ├── agents/             # PPO implementation
 │   └── models/             # Neural network architectures (Actor-Critic)
 ├── pyproject.toml          # Project metadata and dependencies
+├── main.py                 # Main training script
 └── README.md
 ```
 
@@ -42,36 +37,29 @@ rl-training/
 
 ### Running the Training
 
-To start training with the default parameters:
+To start training with the default parameters (500 episodes, horizon of 50):
 ```bash
-python scripts/ppo.py
+python main.py run-cartpole-ppo
 ```
 
 ### Overriding Parameters
 
-Hydra allows you to easily override any configuration parameter from the command line:
+You can easily override parameters using CLI options provided by Click:
 
-- **Change Learning Rate:**
+- **Change Agent Horizon:**
   ```bash
-  python scripts/ppo.py agent.learning_rate=0.001
+  python main.py run-cartpole-ppo --agent-horizon 100
   ```
 
 - **Change Number of Episodes:**
   ```bash
-  python scripts/ppo.py train.max_episodes=2000
+  python main.py run-cartpole-ppo --total-episodes 2000
   ```
 
 - **Modify Multiple Parameters:**
   ```bash
-  python scripts/ppo.py agent.gamma=0.98 agent.k_epochs=10
+  python main.py run-cartpole-ppo --agent-horizon 100 --total-episodes 2000
   ```
-
-### Configuration Hierarchy
-
-The project uses a hierarchical YAML configuration:
-- `configs/agent/ppo.yaml`: Contains PPO hyperparameters like `learning_rate`, `gamma`, `eps_clip`, etc.
-- `configs/env/cartpole.yaml`: Defines the environment name.
-- `configs/config.yaml`: Orchestrates the defaults and defines training loop parameters.
 
 ## 🤖 Algorithm: PPO
 
