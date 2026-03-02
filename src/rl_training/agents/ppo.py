@@ -11,7 +11,7 @@ from rl_training.models.actor_critic import ActorCritic
 class PPO:
     """
     Proximal Policy Optimization (PPO) agent implementation.
-    
+
     This class handles the policy networks, data collection, and the update mechanism
     for the PPO algorithm.
     """
@@ -45,29 +45,42 @@ class PPO:
 
         self.policy = ActorCritic(state_dim, action_dim, self.device).to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
-        self.policy_old = ActorCritic(state_dim, action_dim, self.device).to(self.device)
+        self.policy_old = ActorCritic(state_dim, action_dim, self.device).to(
+            self.device
+        )
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.mse_loss = nn.MSELoss()
         self.data: List[Any] = []
 
-    def put_data(self, item: Tuple[np.ndarray, int, float, np.ndarray, float, bool]) -> None:
+    def put_data(
+        self, item: Tuple[np.ndarray, int, float, np.ndarray, float, bool]
+    ) -> None:
         """
         Store a single transition in the agent's memory.
 
         Args:
-            item (Tuple[np.ndarray, int, float, np.ndarray, float, bool]): 
+            item (Tuple[np.ndarray, int, float, np.ndarray, float, bool]):
                 A transition tuple containing (state, action, reward, next_state, action_prob, done).
         """
         self.data.append(item)
 
-    def make_batch(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def make_batch(
+        self,
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
         """
         Process the collected transitions into tensors for a training update.
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-                Tensors representing (states, actions, rewards, next_states, done_masks, old_log_probs).
+                Tensors representing (states, actions, rewards, next_states, old_log_probs, done_masks).
         """
         s_lst, a_lst, r_lst, s_prime_lst, prob_a_lst, done_lst = [], [], [], [], [], []
         for transition in self.data:
@@ -108,8 +121,15 @@ class PPO:
             log_probs, state_values, dist_entropy = self.policy.evaluate(s, a.squeeze())
             ratios = torch.exp(log_probs - old_log_prob.squeeze())
             surr1 = ratios * advantage.squeeze()
-            surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantage.squeeze()
-            loss = -torch.min(surr1, surr2) + 0.5 * self.mse_loss(state_values, target) - 0.01 * dist_entropy
+            surr2 = (
+                torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip)
+                * advantage.squeeze()
+            )
+            loss = (
+                -torch.min(surr1, surr2)
+                + 0.5 * self.mse_loss(state_values, target)
+                - 0.01 * dist_entropy
+            )
 
             self.optimizer.zero_grad()
             loss.mean().backward()

@@ -49,23 +49,36 @@ class ActorCritic(nn.Module):
         handle the logic.
         """
         raise NotImplementedError
-    
-    def act(self, state: np.ndarray) -> Tuple[int, float]:
+
+    def act(
+        self, state: np.ndarray
+    ) -> Tuple[Union[int, np.ndarray], Union[float, np.ndarray]]:
         """
-        Sample an action based on the current state.
+        Sample an action based on the current state (supports batched states).
 
         Args:
-            state (np.ndarray): The current environment observation.
+            state (np.ndarray): The current environment observation(s).
 
         Returns:
-            Tuple[int, float]: A tuple containing the sampled action and its log probability.
+            Tuple[Union[int, np.ndarray], Union[float, np.ndarray]]: A tuple containing the sampled action(s) and log probability(ies).
         """
-        state_tensor = torch.from_numpy(state).float().to(self.device)
+        if state.ndim == 1:
+            state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
+        else:
+            state_tensor = torch.from_numpy(state).float().to(self.device)
+
         action_probs = self.actor(state_tensor)
         dist = Categorical(action_probs)
         action = dist.sample()
         action_logprob = dist.log_prob(action)
-        return action.item(), action_logprob.item()
+
+        actions_np = action.detach().cpu().numpy()
+        logprobs_np = action_logprob.detach().cpu().numpy()
+
+        if state.ndim == 1:
+            return actions_np[0], logprobs_np[0]
+
+        return actions_np, logprobs_np
     
     def evaluate(self, state: torch.Tensor, action: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """

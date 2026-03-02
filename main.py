@@ -3,8 +3,10 @@ from time import sleep
 import click
 import gymnasium as gym
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from gymnasium.wrappers import NormalizeObservation
+from gymnasium.wrappers.vector import NormalizeObservation as VecNormalizeObservation
 from tqdm import tqdm
 
 from rl_training.agents.ppo import PPO
@@ -18,49 +20,70 @@ def cli():
 @cli.command()
 @click.option("--agent-horizon", default=50, help="Horizon for the agent.")
 @click.option("--total-episodes", default=500, help="Total number of episodes.")
-def run_cartpole_ppo(agent_horizon: int, total_episodes: int) -> None:
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    env = gym.make("CartPole-v1", render_mode=None)
-    env = NormalizeObservation(env)
-    state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
+@click.option("--use-gpu", default=True, help="Use GPU for training.")
+@click.option("--num-agents", default=4, help="Number of parallel agents.")
+def run_cartpole_ppo(
+    agent_horizon: int, total_episodes: int, use_gpu: bool, num_agents: int
+) -> None:
+    device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
+    envs = gym.make_vec("CartPole-v1", num_envs=num_agents, render_mode=None)
+    envs = VecNormalizeObservation(envs)
+
+    state_dim = (
+        envs.single_observation_space.shape[0]
+        if hasattr(envs, "single_observation_space")
+        else envs.observation_space.shape[1]
+    )
+    action_dim = (
+        envs.single_action_space.n
+        if hasattr(envs, "single_action_space")
+        else envs.action_space[0].n
+    )
+
     model = PPO(state_dim=state_dim, action_dim=action_dim, device=device)
 
     rewards_per_episode = []
-    score = 0.0
+
     progress_bar = tqdm(
-        range(total_episodes),
         total=total_episodes,
         desc="Agent is currently learning ...",
     )
-    for episode_number in progress_bar:
-        s, _ = env.reset()
-        done = False
-        truncated = False
-        episode_reward = 0.0
 
-        while not done and not truncated:
-            for t in range(agent_horizon):
-                prob = model.policy_old.act(s)
-                a = prob[0]
-                a_log_prob = prob[1]
-                s_prime, r, done, truncated, info = env.step(a)
+    completed_episodes = 0
+    s, _ = envs.reset()
+    episode_rewards = np.zeros(num_agents)
+
+    while completed_episodes < total_episodes:
+        for t in range(agent_horizon):
+            probs = model.policy_old.act(s)
+            a = probs[0]
+            a_log_prob = probs[1]
+
+            s_prime, r, term, trunc, info = envs.step(a)
+            done = term | trunc
+
+            for i in range(num_agents):
                 model.put_data(
-                    (s, a, r / 100.0, s_prime, a_log_prob, done or truncated)
+                    (s[i], a[i], r[i] / 100.0, s_prime[i], a_log_prob[i], done[i])
                 )
-                s = s_prime
-                score += r
-                episode_reward += r
-                if done or truncated:
-                    break
+                episode_rewards[i] += r[i]
 
-            model.update()
-            score = 0.0
+                if done[i]:
+                    rewards_per_episode.append(episode_rewards[i])
+                    progress_bar.set_postfix({"episode reward": episode_rewards[i]})
+                    episode_rewards[i] = 0.0
+                    completed_episodes += 1
+                    progress_bar.update(1)
 
-        rewards_per_episode.append(episode_reward)
-        progress_bar.set_postfix({"episode reward": episode_reward})
+            s = s_prime
 
-    env.close()
+            if completed_episodes >= total_episodes:
+                break
+
+        model.update()
+
+    envs.close()
+    progress_bar.close()
 
     plt.figure()
     plt.plot(rewards_per_episode)
@@ -73,8 +96,8 @@ def run_cartpole_ppo(agent_horizon: int, total_episodes: int) -> None:
     env_show = gym.make("CartPole-v1", render_mode="human")
     env_show = NormalizeObservation(env_show)
 
-    env_show.obs_rms.mean = env.obs_rms.mean.copy()
-    env_show.obs_rms.var = env.obs_rms.var.copy()
+    env_show.obs_rms.mean = envs.obs_rms.mean.copy()
+    env_show.obs_rms.var = envs.obs_rms.var.copy()
     env_show.update_running_mean = False
 
     s, _ = env_show.reset()
